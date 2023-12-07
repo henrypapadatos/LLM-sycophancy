@@ -5,6 +5,12 @@
 		},
 		{
 			"path": "../MOSS-RLHF"
+		},
+		{
+			"path": "../sycophancy-intervention"
+		},
+		{
+			"path": "../sycophancy-eval"
 		}
 	],
 	"settings": {}

@@ -1,5 +1,6 @@
 #%% 
 import os
+import numpy as np
 import pandas as pd
 import torch
 import torch.nn as nn
@@ -34,11 +35,19 @@ def prepare_dataset(dataset_file: str, split: float, size: int, layer: int, verb
         print('Initial shape: ', df.shape)
 
     #remove 1 row over 2 when the column 'sycophancy' is 0
-    #to have a balanced dataset if sycophantic and not sycophantic pairs
-    df_not_sycophantic = df[df['sycophancy']==0]
-    df_not_sycophantic = df_not_sycophantic.iloc[::2]
-    df_not_sycophantic_index = df_not_sycophantic['index'].tolist()
+    #to have a balanced dataset with sycophantic and not sycophantic pairs
+    df_not_sycophantic_index = df[df['sycophancy']==0]['index'].tolist()
+    new_df_not_sycophantic_index = []
+    # iterate 2 by 2 over the list and take randomly one of the 2 elements
+    for i in range(0, len(df_not_sycophantic_index), 2):
+        if np.random.randint(2) == 0:
+            new_df_not_sycophantic_index.append(df_not_sycophantic_index[i])
+        else:
+            new_df_not_sycophantic_index.append(df_not_sycophantic_index[i+1])
+    df_not_sycophantic_index = new_df_not_sycophantic_index
+
     df_sycophantic_index = df[df['sycophancy']==1]['index'].tolist()
+
     df = df[df['index'].isin(df_not_sycophantic_index + df_sycophantic_index)]
     if verbose:
         print('Post pairing shape: ', df.shape)
@@ -86,7 +95,9 @@ def setup_wandb(config):
     # Start a new run, tracking hyperparameters in config
     run = wandb.init(
         # Set the project where this run will be logged
-        project="probe_training",
+        project="probe_training_1",
+        #set the name of the run
+        name=f"probe_{config['activation_layer']}",
         # Track hyperparameters
         config=config,
     )
@@ -180,6 +191,11 @@ def train_probe(probe, loss_fn, optimizer, inputs_train, labels_train, inputs_te
     #compute the test accuracy before training
     train_accuracy, train_loss = get_probe_accuracy(probe, loss_fn, inputs_train, labels_train, batch_size=batch_size)
     test_accuracy, test_loss = get_probe_accuracy(probe, loss_fn, inputs_test, labels_test, batch_size=batch_size)
+    if  use_wandb:
+            wandb.log({"initial_train_loss": train_loss, 
+                      "initial_train_accuracy": train_accuracy, 
+                      "initial_test_loss": test_loss, 
+                      "initial_test_accuracy": test_accuracy})
 
     #train the model
     for epoch in range(epochs):
@@ -237,8 +253,7 @@ def train(config: dict):
     inputs_train, labels_train, inputs_test, labels_test = prepare_dataset(size=config['dataset_size'], 
                                                                            layer=config['activation_layer'],
                                                                            dataset_file=config['dataset_file'],
-                                                                           split = config['split_train_test'],
-                                                                           verbose=True)
+                                                                           split = config['split_train_test'])
     
     #create the probe model
     probe, loss_fn, optimizer = create_probe(number_of_layers=config['number_of_layers'], learning_rate=config['learning_rate'], use_wandb=config['use_wandb'])
@@ -246,24 +261,28 @@ def train(config: dict):
     #train the probe model
     train_probe(probe, loss_fn, optimizer, inputs_train, labels_train, inputs_test, labels_test, epochs=config['epochs'], batch_size=config['batch_size'], use_wandb=config['use_wandb'], verbose=True)
 
+    if config['use_wandb']:
+        wandb.finish()
+
 #%%
 if __name__ == "__main__":
 
-    os.environ['CUDA_VISIBLE_DEVICES'] = '0'
+    os.environ['CUDA_VISIBLE_DEVICES'] = '5'
 
-    #setup the config for wandb
-    config={
-            "use_wandb": True,
-            "dataset_file": "rotten_tomatoes_sycophantic_activations.pkl",
-            "dataset_size": 10000,
-            "activation_layer": 10,
-            "split_train_test": 0.8,
+    for layer in range(32):
 
-            "number_of_layers": 1,
-            "learning_rate": 0.001,
-            "epochs": 60,
-            "batch_size": 8,
-        }
-    
-    train(config)
-# %%
+        #setup the config for wandb
+        config={
+                "use_wandb": True,
+                "dataset_file": "rotten_tomatoes_sycophantic_activations.pkl",
+                "dataset_size": 10000,
+                "activation_layer": layer,
+                "split_train_test": 0.8,
+
+                "number_of_layers": 1,
+                "learning_rate": 0.001,
+                "epochs": 80,
+                "batch_size": 8,
+            }
+        
+        train(config)

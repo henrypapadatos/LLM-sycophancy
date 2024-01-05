@@ -95,9 +95,9 @@ def setup_wandb(config):
     # Start a new run, tracking hyperparameters in config
     run = wandb.init(
         # Set the project where this run will be logged
-        project="probe_training_1",
-        #set the name of the run
-        name=f"probe_{config['activation_layer']}",
+        project="probe_training_2",
+        # #set the name of the run
+        # name=f"probe_{config['activation_layer']}",
         # Track hyperparameters
         config=config,
     )
@@ -263,26 +263,32 @@ def train(config: dict):
 
     if config['use_wandb']:
         wandb.finish()
+    
+    if config['save_probe']:
+        probe_name = f"probe_{config['activation_layer']}.pt"
+        torch.save(probe, probe_name)
 
 #%%
 if __name__ == "__main__":
 
     os.environ['CUDA_VISIBLE_DEVICES'] = '5'
 
-    for layer in range(32):
+    #for layer in range(32):
 
-        #setup the config for wandb
-        config={
-                "use_wandb": True,
-                "dataset_file": "rotten_tomatoes_sycophantic_activations.pkl",
-                "dataset_size": 10000,
-                "activation_layer": layer,
-                "split_train_test": 0.8,
+    #setup the config for wandb
+    config={
+            "use_wandb": True,
+            "dataset_file": "rotten_tomatoes_sycophantic_activations.pkl",
+            "dataset_size": 10000,
+            "activation_layer": 23,
+            "split_train_test": 0.8,
 
-                "number_of_layers": 1,
-                "learning_rate": 0.001,
-                "epochs": 80,
-                "batch_size": 8,
-            }
+            "number_of_layers": 1,
+            "learning_rate": 0.001,
+            "epochs": 80,
+            "batch_size": 8,
+
+            "save_probe": True,
+        }
         
-        train(config)
+    train(config)

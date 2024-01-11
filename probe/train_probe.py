@@ -249,7 +249,7 @@ def train_probe(probe, loss_fn, optimizer, inputs_train, labels_train, inputs_te
 
         #save probe every 10 epochs
         if (epoch+1)%10 == 0:
-            probe_name = f"probe_{epoch+1}_{config['activation_layer']}.pt"
+            probe_name = f"checkpoints/probe_{epoch+1}_{config['activation_layer']}.pt"
             torch.save(probe, probe_name)
 
 #%%
@@ -274,7 +274,7 @@ def train(config: dict):
         wandb.finish()
     
     if config['save_probe']:
-        probe_name = f"probe_{config['activation_layer']}.pt"
+        probe_name = f"checkpoints/probe_{config['activation_layer']}.pt"
         torch.save(probe, probe_name)
 
 #%%

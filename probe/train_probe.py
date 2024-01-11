@@ -195,7 +195,11 @@ def train_probe(probe, loss_fn, optimizer, inputs_train, labels_train, inputs_te
             wandb.log({"initial_train_loss": train_loss, 
                       "initial_train_accuracy": train_accuracy, 
                       "initial_test_loss": test_loss, 
-                      "initial_test_accuracy": test_accuracy})
+                      "initial_test_accuracy": test_accuracy,
+                      "train_loss": train_loss,
+                      "train_accuracy": train_accuracy,
+                      "test_loss": test_loss,
+                      "test_accuracy": test_accuracy})
 
     #train the model
     for epoch in range(epochs):
@@ -243,6 +247,11 @@ def train_probe(probe, loss_fn, optimizer, inputs_train, labels_train, inputs_te
             print(f"Test loss: {test_loss:.3f}")
             print(f"Test accuracy: {test_accuracy:.3f}")
 
+        #save probe every 10 epochs
+        if (epoch+1)%10 == 0:
+            probe_name = f"probe_{epoch+1}_{config['activation_layer']}.pt"
+            torch.save(probe, probe_name)
+
 #%%
 def train(config: dict):    
     #setup wandb
@@ -280,7 +289,7 @@ if __name__ == "__main__":
             "use_wandb": True,
             "dataset_file": "rotten_tomatoes_sycophantic_activations.pkl",
             "dataset_size": 10000,
-            "activation_layer": 23,
+            "activation_layer": 16,
             "split_train_test": 0.8,
 
             "number_of_layers": 1,

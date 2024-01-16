@@ -280,7 +280,7 @@ def train(config: dict):
 #%%
 if __name__ == "__main__":
 
-    os.environ['CUDA_VISIBLE_DEVICES'] = '5'
+    os.environ['CUDA_VISIBLE_DEVICES'] = '2'
 
     #for layer in range(32):
 
@@ -288,7 +288,7 @@ if __name__ == "__main__":
     config={
             "use_wandb": True,
             "dataset_file": "rotten_tomatoes_sycophantic_activations.pkl",
-            "dataset_size": 10000,
+            "dataset_size": 2000,
             "activation_layer": 16,
             "split_train_test": 0.8,
 
@@ -297,7 +297,7 @@ if __name__ == "__main__":
             "epochs": 80,
             "batch_size": 8,
 
-            "save_probe": True,
+            "save_probe": False,
         }
         
     train(config)

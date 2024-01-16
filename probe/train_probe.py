@@ -36,14 +36,26 @@ def prepare_dataset(dataset_file: str, split: float, size: int, layer: int, verb
 
     #remove 1 row over 2 when the column 'sycophancy' is 0
     #to have a balanced dataset with sycophantic and not sycophantic pairs
+    #if an 'index' column does not exist, create it
+    if 'index' not in df.columns:
+        if verbose:
+            print('Creating index column')
+        df['index'] = df.index
+        
     df_not_sycophantic_index = df[df['sycophancy']==0]['index'].tolist()
+    # # if the list is odd, remove the last element
+    # if len(df_not_sycophantic_index)%2 != 0:
+    #     df_not_sycophantic_index = df_not_sycophantic_index[:-1]
     new_df_not_sycophantic_index = []
+    print(range(0, len(df_not_sycophantic_index), 2))
     # iterate 2 by 2 over the list and take randomly one of the 2 elements
     for i in range(0, len(df_not_sycophantic_index), 2):
+        assert df_not_sycophantic_index[i] == df_not_sycophantic_index[i+1]-1
         if np.random.randint(2) == 0:
             new_df_not_sycophantic_index.append(df_not_sycophantic_index[i])
         else:
             new_df_not_sycophantic_index.append(df_not_sycophantic_index[i+1])
+    print(i)
     df_not_sycophantic_index = new_df_not_sycophantic_index
 
     df_sycophantic_index = df[df['sycophancy']==1]['index'].tolist()
@@ -90,12 +102,13 @@ def prepare_dataset(dataset_file: str, split: float, size: int, layer: int, verb
 
     return inputs_train, labels_train, inputs_test, labels_test
 
+inputs_train, labels_train, inputs_test, labels_test = prepare_dataset(size=4000, layer=16, dataset_file='MRPC_sycophantic_activations.pkl', split=0.8, verbose=True)
 #%% 
 def setup_wandb(config):
     # Start a new run, tracking hyperparameters in config
     run = wandb.init(
         # Set the project where this run will be logged
-        project="probe_training_2",
+        project="probe_training_MRPC",
         # #set the name of the run
         # name=f"probe_{config['activation_layer']}",
         # Track hyperparameters
@@ -247,10 +260,10 @@ def train_probe(probe, loss_fn, optimizer, inputs_train, labels_train, inputs_te
             print(f"Test loss: {test_loss:.3f}")
             print(f"Test accuracy: {test_accuracy:.3f}")
 
-        #save probe every 10 epochs
-        if (epoch+1)%10 == 0:
-            probe_name = f"checkpoints/probe_{epoch+1}_{config['activation_layer']}.pt"
-            torch.save(probe, probe_name)
+        # #save probe every 10 epochs
+        # if (epoch+1)%10 == 0:
+        #     probe_name = f"checkpoints/probe_{epoch+1}_{config['activation_layer']}.pt"
+        #     torch.save(probe, probe_name)
 
 #%%
 def train(config: dict):    
@@ -262,7 +275,8 @@ def train(config: dict):
     inputs_train, labels_train, inputs_test, labels_test = prepare_dataset(size=config['dataset_size'], 
                                                                            layer=config['activation_layer'],
                                                                            dataset_file=config['dataset_file'],
-                                                                           split = config['split_train_test'])
+                                                                           split = config['split_train_test'],
+                                                                           verbose=True)
     
     #create the probe model
     probe, loss_fn, optimizer = create_probe(number_of_layers=config['number_of_layers'], learning_rate=config['learning_rate'], use_wandb=config['use_wandb'])
@@ -280,15 +294,16 @@ def train(config: dict):
 #%%
 if __name__ == "__main__":
 
-    os.environ['CUDA_VISIBLE_DEVICES'] = '2'
+    os.environ['CUDA_VISIBLE_DEVICES'] = '1'
 
     #for layer in range(32):
 
     #setup the config for wandb
     config={
-            "use_wandb": True,
-            "dataset_file": "rotten_tomatoes_sycophantic_activations.pkl",
-            "dataset_size": 2000,
+            "use_wandb": False,
+            # "dataset_file": "rotten_tomatoes_sycophantic_activations.pkl",
+            "dataset_file": "MRPC_sycophantic_activations.pkl",
+            "dataset_size": 4000,
             "activation_layer": 16,
             "split_train_test": 0.8,
 

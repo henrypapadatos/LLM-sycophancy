@@ -6,6 +6,7 @@ import torch
 import torch.nn as nn
 from tqdm import tqdm
 import wandb
+import random
 
 #make sure that the code runs in the local directory
 os.chdir(os.path.dirname(os.path.abspath(__file__)))
@@ -43,20 +44,9 @@ def prepare_dataset(dataset_file: str, split: float, size: int, layer: int, verb
         df['index'] = df.index
         
     df_not_sycophantic_index = df[df['sycophancy']==0]['index'].tolist()
-    # # if the list is odd, remove the last element
-    # if len(df_not_sycophantic_index)%2 != 0:
-    #     df_not_sycophantic_index = df_not_sycophantic_index[:-1]
-    new_df_not_sycophantic_index = []
-    print(range(0, len(df_not_sycophantic_index), 2))
-    # iterate 2 by 2 over the list and take randomly one of the 2 elements
-    for i in range(0, len(df_not_sycophantic_index), 2):
-        assert df_not_sycophantic_index[i] == df_not_sycophantic_index[i+1]-1
-        if np.random.randint(2) == 0:
-            new_df_not_sycophantic_index.append(df_not_sycophantic_index[i])
-        else:
-            new_df_not_sycophantic_index.append(df_not_sycophantic_index[i+1])
-    print(i)
-    df_not_sycophantic_index = new_df_not_sycophantic_index
+    #randomly sample half the list
+    np.random.seed(42)
+    df_not_sycophantic_index = np.random.choice(df_not_sycophantic_index, size=len(df_not_sycophantic_index)//2, replace=False).tolist()
 
     df_sycophantic_index = df[df['sycophancy']==1]['index'].tolist()
 
@@ -102,13 +92,12 @@ def prepare_dataset(dataset_file: str, split: float, size: int, layer: int, verb
 
     return inputs_train, labels_train, inputs_test, labels_test
 
-inputs_train, labels_train, inputs_test, labels_test = prepare_dataset(size=4000, layer=16, dataset_file='MRPC_sycophantic_activations.pkl', split=0.8, verbose=True)
 #%% 
 def setup_wandb(config):
     # Start a new run, tracking hyperparameters in config
     run = wandb.init(
         # Set the project where this run will be logged
-        project="probe_training_MRPC",
+        project="probe_training_MRPC_RT",
         # #set the name of the run
         # name=f"probe_{config['activation_layer']}",
         # Track hyperparameters
@@ -200,19 +189,20 @@ def train_probe(probe, loss_fn, optimizer, inputs_train, labels_train, inputs_te
     
     #create a dataloader for the train
     train_dataloader = torch.utils.data.DataLoader(list(zip(inputs_train, labels_train)), batch_size=batch_size)
+    #shuffle the dataset
 
     #compute the test accuracy before training
     train_accuracy, train_loss = get_probe_accuracy(probe, loss_fn, inputs_train, labels_train, batch_size=batch_size)
     test_accuracy, test_loss = get_probe_accuracy(probe, loss_fn, inputs_test, labels_test, batch_size=batch_size)
     if  use_wandb:
             wandb.log({"initial_train_loss": train_loss, 
-                      "initial_train_accuracy": train_accuracy, 
-                      "initial_test_loss": test_loss, 
-                      "initial_test_accuracy": test_accuracy,
-                      "train_loss": train_loss,
-                      "train_accuracy": train_accuracy,
-                      "test_loss": test_loss,
-                      "test_accuracy": test_accuracy})
+                    "initial_train_accuracy": train_accuracy, 
+                    "initial_test_loss": test_loss, 
+                    "initial_test_accuracy": test_accuracy,
+                    "train_loss": train_loss,
+                    "train_accuracy": train_accuracy,
+                    "test_loss": test_loss,
+                    "test_accuracy": test_accuracy})
 
     #train the model
     for epoch in range(epochs):
@@ -272,12 +262,44 @@ def train(config: dict):
         setup_wandb(config)
     
     #prepare the dataset
-    inputs_train, labels_train, inputs_test, labels_test = prepare_dataset(size=config['dataset_size'], 
-                                                                           layer=config['activation_layer'],
-                                                                           dataset_file=config['dataset_file'],
-                                                                           split = config['split_train_test'],
-                                                                           verbose=True)
+    #check if config['dataset_file'] is a list
+    if isinstance(config['dataset_file'], list):
+        #initialise inputs_train, labels_train, inputs_test, labels_test as empty lists
+        inputs_train, labels_train, inputs_test, labels_test = [], [], [], []
+        for dataset_file in config['dataset_file']:
+            inputs_train_el, labels_train_el, inputs_test_el, labels_test_el = prepare_dataset(size=config['dataset_size'], 
+                                                                            layer=config['activation_layer'],
+                                                                            dataset_file=dataset_file,
+                                                                            split = config['split_train_test'],
+                                                                            verbose=True)
+            inputs_train += inputs_train_el
+            labels_train += labels_train_el
+            inputs_test += inputs_test_el
+            labels_test += labels_test_el
+        #shuffle the dataset so elements of all datasets are mixed
+        random.seed(42)  # Set the seed for reproducibility
+        combined_train = list(zip(inputs_train, labels_train))
+        random.shuffle(combined_train)  # Shuffle the combined list to mix data points
+        inputs_train, labels_train = zip(*combined_train)  # Unzip pairs back into separate lists
+        combined_test = list(zip(inputs_test, labels_test))
+        random.shuffle(combined_test)
+        inputs_test, labels_test = zip(*combined_test)
+        #convert back to list
+        inputs_train = list(inputs_train)
+        labels_train = list(labels_train)
+        inputs_test = list(inputs_test)
+        labels_test = list(labels_test)
+
+    else:
+        #prepare the dataset
+        inputs_train, labels_train, inputs_test, labels_test = prepare_dataset(size=config['dataset_size'], 
+                                                                            layer=config['activation_layer'],
+                                                                            dataset_file=config['dataset_file'],
+                                                                            split = config['split_train_test'],
+                                                                            verbose=True)
     
+    print('Size of the train dataset: ', len(inputs_train))
+    #shuffle the dataset
     #create the probe model
     probe, loss_fn, optimizer = create_probe(number_of_layers=config['number_of_layers'], learning_rate=config['learning_rate'], use_wandb=config['use_wandb'])
     
@@ -288,7 +310,7 @@ def train(config: dict):
         wandb.finish()
     
     if config['save_probe']:
-        probe_name = f"checkpoints/probe_{config['activation_layer']}.pt"
+        probe_name = f"checkpoints/probe_v3_{config['activation_layer']}.pt"
         torch.save(probe, probe_name)
 
 #%%
@@ -296,23 +318,21 @@ if __name__ == "__main__":
 
     os.environ['CUDA_VISIBLE_DEVICES'] = '1'
 
-    #for layer in range(32):
-
-    #setup the config for wandb
+    # for layer in range(32):
+        # #setup the config for wandb
     config={
-            "use_wandb": False,
-            # "dataset_file": "rotten_tomatoes_sycophantic_activations.pkl",
-            "dataset_file": "MRPC_sycophantic_activations.pkl",
-            "dataset_size": 4000,
-            "activation_layer": 16,
+            "use_wandb": True,
+            "dataset_file": ["rotten_tomatoes_sycophantic_activations.pkl","MRPC_sycophantic_activations.pkl"],
+            "dataset_size": 2000,
+            "activation_layer": 17,
             "split_train_test": 0.8,
 
             "number_of_layers": 1,
             "learning_rate": 0.001,
-            "epochs": 80,
+            "epochs": 120,
             "batch_size": 8,
 
-            "save_probe": False,
+            "save_probe": True,
         }
         
     train(config)

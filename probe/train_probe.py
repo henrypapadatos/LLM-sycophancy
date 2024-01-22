@@ -327,14 +327,14 @@ def train(config: dict):
 
     else:
         #prepare the dataset
-        if 'POL' or 'NLP' in dataset_file: 
-                inputs_train_el, labels_train_el, inputs_test_el, labels_test_el = prepare_dataset_anthropic(size=config['dataset_size'], 
-                                                                                    layer=config['activation_layer'],
-                                                                                    dataset_file=dataset_file,
-                                                                                    split = config['split_train_test'],
-                                                                                    verbose=True)
+        if 'POL' or 'NLP' in config['dataset_file']: 
+            inputs_train, labels_train, inputs_test, labels_test = prepare_dataset_anthropic(size=config['dataset_size'], 
+                                                                                layer=config['activation_layer'],
+                                                                                dataset_file=config['dataset_file'],
+                                                                                split = config['split_train_test'],
+                                                                                verbose=True)
         else: 
-            inputs_train_el, labels_train_el, inputs_test_el, labels_test_el = prepare_dataset(size=config['dataset_size'], 
+            inputs_train, labels_train, inputs_test, labels_test = prepare_dataset(size=config['dataset_size'], 
                                                                             layer=config['activation_layer'],
                                                                             dataset_file=dataset_file,
                                                                             split = config['split_train_test'],
@@ -352,7 +352,7 @@ def train(config: dict):
         wandb.finish()
     
     if config['save_probe']:
-        probe_name = f"checkpoints/probe_v6_{config['activation_layer']}.pt"
+        probe_name = f"checkpoints/probe_v8_{config['activation_layer']}.pt"
         torch.save(probe, probe_name)
 
 #%%
@@ -364,12 +364,12 @@ if __name__ == "__main__":
     #     #setup the config for wandb
     config={
             "use_wandb": True,
-            "dataset_file": ["rotten_tomatoes_sycophantic_activations.pkl","MRPC_sycophantic_activations.pkl", "NLP_sycophantic_activations.pkl"],
+            "dataset_file": "NLP_sycophantic_activations.pkl",
             "dataset_size": 2000,
             "activation_layer": 18,
             "split_train_test": 0.8,
 
-            "number_of_layers": 1,
+            "number_of_layers": 3,
             "learning_rate": 0.0005,
             "epochs": 120,
             "batch_size": 4,

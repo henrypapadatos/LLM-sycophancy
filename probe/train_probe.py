@@ -92,12 +92,40 @@ def prepare_dataset(dataset_file: str, split: float, size: int, layer: int, verb
 
     return inputs_train, labels_train, inputs_test, labels_test
 
+#%%
+def prepare_dataset_anthropic(dataset_file: str, split: float, size: int, layer: int, verbose: bool = False):
+    #load the dataframe
+    data_folder = "../datasets"
+    df = pd.read_pickle(os.path.join(data_folder, dataset_file))
+
+    #remove the rows where the activations are None 
+    df = df[df['activations'].notna()]
+    if verbose:
+        print('Initial shape: ', df.shape)
+
+    #sample the dataset to have the desired size
+    df = df.sample(n=size, random_state=42)
+    if verbose:
+        print('Post sampling shape: ', df.shape)
+    
+    #get the activations of the right layer
+    activations = df['activations'].tolist()
+    inputs = [activation[layer] for activation in activations]
+    labels = df['sycophancy'].tolist()
+
+    #split the dataset into train and test
+    inputs_train = inputs[:int(split*size)]
+    labels_train = labels[:int(split*size)]
+    inputs_test = inputs[int(split*size):]
+    labels_test = labels[int(split*size):]
+
+    return inputs_train, labels_train, inputs_test, labels_test
 #%% 
 def setup_wandb(config):
     # Start a new run, tracking hyperparameters in config
     run = wandb.init(
         # Set the project where this run will be logged
-        project="probe_training_MRPC_RT",
+        project="probe_training_MRPC_RT_NLP",
         # #set the name of the run
         # name=f"probe_{config['activation_layer']}",
         # Track hyperparameters
@@ -105,7 +133,7 @@ def setup_wandb(config):
     )
 
 #%%
-def create_probe(number_of_layers: int, learning_rate: float, use_wandb: bool = False, verbose: bool = False):
+def create_probe(number_of_layers: int, learning_rate: float, use_wandb: bool = False, L2: float = 0, verbose: bool = False):
     """
     Create the probe model, the loss function and the optimizer
     """
@@ -144,7 +172,7 @@ def create_probe(number_of_layers: int, learning_rate: float, use_wandb: bool = 
         wandb.config["loss_fn"] = str(loss_fn)
 
     #define the optimizer
-    optimizer = torch.optim.Adam(probe.parameters(), lr=learning_rate)
+    optimizer = torch.optim.Adam(probe.parameters(), lr=learning_rate, weight_decay=L2)
     #log the optimizer to wandb as a hyperparameter
     if  use_wandb:
         wandb.config["optimizer"] = str(optimizer).split('(')[0]
@@ -267,11 +295,18 @@ def train(config: dict):
         #initialise inputs_train, labels_train, inputs_test, labels_test as empty lists
         inputs_train, labels_train, inputs_test, labels_test = [], [], [], []
         for dataset_file in config['dataset_file']:
-            inputs_train_el, labels_train_el, inputs_test_el, labels_test_el = prepare_dataset(size=config['dataset_size'], 
-                                                                            layer=config['activation_layer'],
-                                                                            dataset_file=dataset_file,
-                                                                            split = config['split_train_test'],
-                                                                            verbose=True)
+            if 'POL' or 'NLP' in dataset_file: 
+                inputs_train_el, labels_train_el, inputs_test_el, labels_test_el = prepare_dataset_anthropic(size=config['dataset_size'], 
+                                                                                    layer=config['activation_layer'],
+                                                                                    dataset_file=dataset_file,
+                                                                                    split = config['split_train_test'],
+                                                                                    verbose=True)
+            else: 
+                inputs_train_el, labels_train_el, inputs_test_el, labels_test_el = prepare_dataset(size=config['dataset_size'], 
+                                                                                layer=config['activation_layer'],
+                                                                                dataset_file=dataset_file,
+                                                                                split = config['split_train_test'],
+                                                                                verbose=True)
             inputs_train += inputs_train_el
             labels_train += labels_train_el
             inputs_test += inputs_test_el
@@ -292,16 +327,23 @@ def train(config: dict):
 
     else:
         #prepare the dataset
-        inputs_train, labels_train, inputs_test, labels_test = prepare_dataset(size=config['dataset_size'], 
+        if 'POL' or 'NLP' in dataset_file: 
+                inputs_train_el, labels_train_el, inputs_test_el, labels_test_el = prepare_dataset_anthropic(size=config['dataset_size'], 
+                                                                                    layer=config['activation_layer'],
+                                                                                    dataset_file=dataset_file,
+                                                                                    split = config['split_train_test'],
+                                                                                    verbose=True)
+        else: 
+            inputs_train_el, labels_train_el, inputs_test_el, labels_test_el = prepare_dataset(size=config['dataset_size'], 
                                                                             layer=config['activation_layer'],
-                                                                            dataset_file=config['dataset_file'],
+                                                                            dataset_file=dataset_file,
                                                                             split = config['split_train_test'],
                                                                             verbose=True)
     
     print('Size of the train dataset: ', len(inputs_train))
     #shuffle the dataset
     #create the probe model
-    probe, loss_fn, optimizer = create_probe(number_of_layers=config['number_of_layers'], learning_rate=config['learning_rate'], use_wandb=config['use_wandb'])
+    probe, loss_fn, optimizer = create_probe(number_of_layers=config['number_of_layers'], learning_rate=config['learning_rate'], use_wandb=config['use_wandb'], L2 = config['L2'])
     
     #train the probe model
     train_probe(probe, loss_fn, optimizer, inputs_train, labels_train, inputs_test, labels_test, epochs=config['epochs'], batch_size=config['batch_size'], use_wandb=config['use_wandb'], verbose=True)
@@ -310,7 +352,7 @@ def train(config: dict):
         wandb.finish()
     
     if config['save_probe']:
-        probe_name = f"checkpoints/probe_v3_{config['activation_layer']}.pt"
+        probe_name = f"checkpoints/probe_v6_{config['activation_layer']}.pt"
         torch.save(probe, probe_name)
 
 #%%
@@ -319,18 +361,19 @@ if __name__ == "__main__":
     os.environ['CUDA_VISIBLE_DEVICES'] = '1'
 
     # for layer in range(32):
-        # #setup the config for wandb
+    #     #setup the config for wandb
     config={
             "use_wandb": True,
-            "dataset_file": ["rotten_tomatoes_sycophantic_activations.pkl","MRPC_sycophantic_activations.pkl"],
+            "dataset_file": ["rotten_tomatoes_sycophantic_activations.pkl","MRPC_sycophantic_activations.pkl", "NLP_sycophantic_activations.pkl"],
             "dataset_size": 2000,
-            "activation_layer": 17,
+            "activation_layer": 18,
             "split_train_test": 0.8,
 
             "number_of_layers": 1,
-            "learning_rate": 0.001,
+            "learning_rate": 0.0005,
             "epochs": 120,
-            "batch_size": 8,
+            "batch_size": 4,
+            "L2": 0.00005,
 
             "save_probe": True,
         }

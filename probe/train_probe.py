@@ -294,15 +294,15 @@ def train(config: dict):
     if isinstance(config['dataset_file'], list):
         #initialise inputs_train, labels_train, inputs_test, labels_test as empty lists
         inputs_train, labels_train, inputs_test, labels_test = [], [], [], []
-        for dataset_file in config['dataset_file']:
+        for dataset_file, size in zip(config['dataset_file'], config['dataset_size']):
             if 'POL' or 'NLP' in dataset_file: 
-                inputs_train_el, labels_train_el, inputs_test_el, labels_test_el = prepare_dataset_anthropic(size=config['dataset_size'], 
+                inputs_train_el, labels_train_el, inputs_test_el, labels_test_el = prepare_dataset_anthropic(size=size, 
                                                                                     layer=config['activation_layer'],
                                                                                     dataset_file=dataset_file,
                                                                                     split = config['split_train_test'],
                                                                                     verbose=True)
             else: 
-                inputs_train_el, labels_train_el, inputs_test_el, labels_test_el = prepare_dataset(size=config['dataset_size'], 
+                inputs_train_el, labels_train_el, inputs_test_el, labels_test_el = prepare_dataset(size=size, 
                                                                                 layer=config['activation_layer'],
                                                                                 dataset_file=dataset_file,
                                                                                 split = config['split_train_test'],
@@ -352,26 +352,26 @@ def train(config: dict):
         wandb.finish()
     
     if config['save_probe']:
-        probe_name = f"checkpoints/probe_v8_{config['activation_layer']}.pt"
+        probe_name = f"checkpoints/probe_v13_{config['activation_layer']}.pt"
         torch.save(probe, probe_name)
 
 #%%
 if __name__ == "__main__":
 
-    os.environ['CUDA_VISIBLE_DEVICES'] = '1'
+    os.environ['CUDA_VISIBLE_DEVICES'] = '0'
 
     # for layer in range(32):
     #     #setup the config for wandb
     config={
             "use_wandb": True,
-            "dataset_file": "NLP_sycophantic_activations.pkl",
-            "dataset_size": 2000,
+            "dataset_file": ["NLP_sycophantic_activations.pkl", "rotten_tomatoes_sycophantic_activations.pkl", "MRPC_sycophantic_activations.pkl"],
+            "dataset_size": [2000, 200, 100],
             "activation_layer": 18,
             "split_train_test": 0.8,
 
-            "number_of_layers": 3,
+            "number_of_layers": 1,
             "learning_rate": 0.0005,
-            "epochs": 120,
+            "epochs": 40,
             "batch_size": 4,
             "L2": 0.00005,
 

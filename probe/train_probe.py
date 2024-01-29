@@ -154,9 +154,9 @@ def setup_wandb(config):
     # Start a new run, tracking hyperparameters in config
     run = wandb.init(
         # Set the project where this run will be logged
-        project="probe_training_NLP_RT",
+        project="probe_training_NLP_RT_cross_val",
         # #set the name of the run
-        # name=f"probe_{config['activation_layer']}",
+        name=f"probe_{config['activation_layer']}",
         # Track hyperparameters
         config=config,
     )
@@ -185,6 +185,8 @@ def create_probe(number_of_layers: int, learning_rate: float, use_wandb: bool = 
         ) for i in range(len(hidden_layers)-2)],
         nn.Linear(hidden_layers[-2], hidden_layers[-1]),
         nn.Sigmoid()
+        #add a linear acitvation fucniton
+        # nn.Identity()
     )
 
     #if cuda is available, move the model to cuda
@@ -196,6 +198,7 @@ def create_probe(number_of_layers: int, learning_rate: float, use_wandb: bool = 
     
     #define the loss function
     loss_fn = nn.BCELoss()
+    # loss_fn = nn.MSELoss()
     #log the loss function to wandb as a hyperparameter
     if  use_wandb:
         wandb.config["loss_fn"] = str(loss_fn)
@@ -308,8 +311,10 @@ def get_open_ended_performances(probe, open_ended_df):
         diff = np.median(np.subtract(mean_sycophantic_score, mean_not_sycophantic_score))
         diff_agreeing_type = np.median(np.subtract(mean_sycophantic_agreeing_type, mean_not_sycophantic_agreeing_type))
         diff_disagreeing_type = np.median(np.subtract(mean_sycophantic_disagreeing_type, mean_not_sycophantic_disagreeing_type))
+        med_sycophantic_score = np.median(mean_sycophantic_score)
+        med_not_sycophantic_score = np.median(mean_not_sycophantic_score)
 
-        return diff, diff_agreeing_type, diff_disagreeing_type
+        return diff, diff_agreeing_type, diff_disagreeing_type, med_sycophantic_score, med_not_sycophantic_score
 
 #%%
 def get_open_endend_performances(probe, layer):
@@ -331,7 +336,7 @@ def train_probe(probe, loss_fn, optimizer, inputs_train, labels_train, inputs_te
     train_accuracy, train_loss = get_probe_accuracy(probe, loss_fn, inputs_train, labels_train, batch_size=batch_size)
     test_accuracy, test_loss = get_probe_accuracy(probe, loss_fn, inputs_test, labels_test, batch_size=batch_size)
     POL_diff, POL_sycophantic_score, POL_not_sycophantic_score = get_POL_performances(probe, inputs_POL, labels_POL, batch_size=batch_size)
-    open_ended_diff, open_ended_agreeing_type_diff, open_ended_disagreeing_type_diff = get_open_ended_performances(probe, open_ended_df)
+    open_ended_diff, open_ended_agreeing_type_diff, open_ended_disagreeing_type_diff, open_ended_sycophantic_score, open_ended_not_sycophantic_score = get_open_ended_performances(probe, open_ended_df) 
     if  use_wandb:
             wandb.log({"initial_train_loss": train_loss, 
                     "initial_train_accuracy": train_accuracy, 
@@ -346,12 +351,12 @@ def train_probe(probe, loss_fn, optimizer, inputs_train, labels_train, inputs_te
                     "POL_not_sycophantic_score": POL_not_sycophantic_score,
                     "open_ended_diff": open_ended_diff,
                     "open_ended_agreeing_type_diff": open_ended_agreeing_type_diff,
-                    "open_ended_disagreeing_type_diff": open_ended_disagreeing_type_diff})
+                    "open_ended_disagreeing_type_diff": open_ended_disagreeing_type_diff,
+                    "open_ended_sycophantic_score": open_ended_sycophantic_score,
+                    "open_ended_not_sycophantic_score": open_ended_not_sycophantic_score})
 
     #train the model
     for epoch in range(epochs):
-        if verbose:
-            print(f"Epoch {epoch+1}\n-------------------------------")
         #train the model on the train dataset
         train_loss = 0
         train_correct = 0
@@ -381,7 +386,7 @@ def train_probe(probe, loss_fn, optimizer, inputs_train, labels_train, inputs_te
         #compute the test accuracy
         test_accuracy, test_loss = get_probe_accuracy(probe, loss_fn, inputs_test, labels_test, batch_size=batch_size)
         POL_diff, POL_sycophantic_score, POL_not_sycophantic_score = get_POL_performances(probe, inputs_POL, labels_POL, batch_size=batch_size)
-        open_ended_diff, open_ended_agreeing_type_diff, open_ended_disagreeing_type_diff = get_open_ended_performances(probe, open_ended_df)
+        open_ended_diff, open_ended_agreeing_type_diff, open_ended_disagreeing_type_diff, open_ended_sycophantic_score, open_ended_not_sycophantic_score = get_open_ended_performances(probe, open_ended_df)
 
         #log the train loss to wandb
         if  use_wandb:
@@ -395,13 +400,12 @@ def train_probe(probe, loss_fn, optimizer, inputs_train, labels_train, inputs_te
                       "POL_not_sycophantic_score": POL_not_sycophantic_score,
                       "open_ended_diff": open_ended_diff,
                       "open_ended_agreeing_type_diff": open_ended_agreeing_type_diff,
-                      "open_ended_disagreeing_type_diff": open_ended_disagreeing_type_diff})
+                      "open_ended_disagreeing_type_diff": open_ended_disagreeing_type_diff,
+                      "open_ended_sycophantic_score": open_ended_sycophantic_score,
+                      "open_ended_not_sycophantic_score": open_ended_not_sycophantic_score})
 
         if verbose:
-            print(f"Train loss: {train_loss / len(train_dataloader):.3f}")
-            print(f"Train accuracy: {train_accuracy:.3f}")
-            print(f"Test loss: {test_loss:.3f}")
-            print(f"Test accuracy: {test_accuracy:.3f}")
+            print(f"Epoch {epoch+1}, Train loss: {train_loss / len(train_dataloader):.3f}, Train accuracy: {train_accuracy*100:.2f}%, Test loss: {test_loss:.3f}, Test accuracy: {test_accuracy*100:.2f}%")
 
         # #save probe every 10 epochs
         # if (epoch+1)%10 == 0:
@@ -483,7 +487,7 @@ def train(config: dict):
         wandb.finish()
     
     if config['save_probe']:
-        probe_name = f"checkpoints/probe_vX_{config['activation_layer']}.pt"
+        probe_name = f"checkpoints/probe_v14_{config['activation_layer']}.pt"
         torch.save(probe, probe_name)
 
 #%%
@@ -491,22 +495,22 @@ if __name__ == "__main__":
 
     os.environ['CUDA_VISIBLE_DEVICES'] = '3'
 
-    # for layer in range(32):
-    #     #setup the config for wandb
-    config={
-            "use_wandb": True,
-            "dataset_file": ["NLP_sycophantic_activations.pkl", "rotten_tomatoes_sycophantic_activations.pkl"],
-            "dataset_size": [2000, 200],
-            "activation_layer": 18,
-            "split_train_test": 0.8,
+    for layer in range(32):
+        #setup the config for wandb
+        config={
+                "use_wandb": True,
+                "dataset_file": ["NLP_sycophantic_activations.pkl", "rotten_tomatoes_sycophantic_activations.pkl"],
+                "dataset_size": [2000, 200],
+                "activation_layer": layer,
+                "split_train_test": 0.8,
 
-            "number_of_layers": 1,
-            "learning_rate": 0.0005,
-            "epochs": 120,
-            "batch_size": 4,
-            "L2": 0.00005,
+                "number_of_layers": 1,
+                "learning_rate": 0.0005,
+                "epochs": 120,
+                "batch_size": 4,
+                "L2": 0.00005,
 
-            "save_probe": False,
-        }
+                "save_probe": False,
+            }
         
-    train(config)
+        train(config)

@@ -154,7 +154,7 @@ def setup_wandb(config):
     # Start a new run, tracking hyperparameters in config
     run = wandb.init(
         # Set the project where this run will be logged
-        project="probe_training_NLP_RT_cross_val",
+        project="probe_training_NLP",
         # #set the name of the run
         name=f"probe_{config['activation_layer']}",
         # Track hyperparameters
@@ -315,11 +315,6 @@ def get_open_ended_performances(probe, open_ended_df):
         med_not_sycophantic_score = np.median(mean_not_sycophantic_score)
 
         return diff, diff_agreeing_type, diff_disagreeing_type, med_sycophantic_score, med_not_sycophantic_score
-
-#%%
-def get_open_endend_performances(probe, layer):
-
-    df = pd.read_pickle('../datasets/NLP_sycophantic_activations.pkl')
 
 #%%
 def train_probe(probe, loss_fn, optimizer, inputs_train, labels_train, inputs_test, labels_test, epochs: int, batch_size: int = 8, use_wandb: bool = False, verbose: bool = False,
@@ -487,20 +482,19 @@ def train(config: dict):
         wandb.finish()
     
     if config['save_probe']:
-        probe_name = f"checkpoints/probe_v14_{config['activation_layer']}.pt"
+        probe_name = f"checkpoints/probe_v16_{config['activation_layer']}.pt"
         torch.save(probe, probe_name)
 
 #%%
 if __name__ == "__main__":
 
-    os.environ['CUDA_VISIBLE_DEVICES'] = '3'
+    os.environ['CUDA_VISIBLE_DEVICES'] = '7'
 
     for layer in range(32):
-        #setup the config for wandb
         config={
                 "use_wandb": True,
-                "dataset_file": ["NLP_sycophantic_activations.pkl", "rotten_tomatoes_sycophantic_activations.pkl"],
-                "dataset_size": [2000, 200],
+                "dataset_file": "NLP_sycophantic_activations.pkl",
+                "dataset_size": 2000,
                 "activation_layer": layer,
                 "split_train_test": 0.8,
 

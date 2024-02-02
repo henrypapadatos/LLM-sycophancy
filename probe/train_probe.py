@@ -156,7 +156,8 @@ def setup_wandb(config):
         # Set the project where this run will be logged
         project="probe_training_NLP",
         # #set the name of the run
-        name=f"probe_{config['activation_layer']}",
+        name="prove V17",
+        # name=f"probe_{config['activation_layer']}",
         # Track hyperparameters
         config=config,
     )
@@ -482,7 +483,7 @@ def train(config: dict):
         wandb.finish()
     
     if config['save_probe']:
-        probe_name = f"checkpoints/probe_v16_{config['activation_layer']}.pt"
+        probe_name = f"checkpoints/probe_v17_{config['activation_layer']}.pt"
         torch.save(probe, probe_name)
 
 #%%
@@ -490,21 +491,21 @@ if __name__ == "__main__":
 
     os.environ['CUDA_VISIBLE_DEVICES'] = '7'
 
-    for layer in range(32):
-        config={
-                "use_wandb": True,
-                "dataset_file": "NLP_sycophantic_activations.pkl",
-                "dataset_size": 2000,
-                "activation_layer": layer,
-                "split_train_test": 0.8,
+    # for layer in range(32):
+    config={
+            "use_wandb": True,
+            "dataset_file": "NLP_sycophantic_activations.pkl",
+            "dataset_size": 2000,
+            "activation_layer": 31,
+            "split_train_test": 0.8,
 
-                "number_of_layers": 1,
-                "learning_rate": 0.0005,
-                "epochs": 120,
-                "batch_size": 4,
-                "L2": 0.00005,
+            "number_of_layers": 1,
+            "learning_rate": 0.0005,
+            "epochs": 120,
+            "batch_size": 4,
+            "L2": 0.00005,
 
-                "save_probe": False,
-            }
-        
-        train(config)
+            "save_probe": True,
+        }
+    
+    train(config)

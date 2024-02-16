@@ -531,7 +531,7 @@ def train(config: dict):
                                                                                                          dataset_file=dataset_file,
                                                                                                          split=config['split_train_test'],
                                                                                                          verbose=True)
-        elif 'MRPC' in dataset_file or ' rotten' in dataset_file:
+        elif 'MRPC' in dataset_file or 'rotten' in dataset_file:
             inputs_train_el, labels_train_el, inputs_test_el, labels_test_el = prepare_dataset(size=size,
                                                                                                layer=config['activation_layer'],
                                                                                                dataset_file=dataset_file,
@@ -545,7 +545,7 @@ def train(config: dict):
                                                                                                           split=config['split_train_test'],
                                                                                                           verbose=True)
         else:
-            raise ValueError('Unknown dataset file')
+            raise ValueError('Unknown dataset file:', dataset_file)
 
         inputs_train += inputs_train_el
         labels_train += labels_train_el
@@ -589,20 +589,20 @@ def train(config: dict):
         wandb.finish()
 
     if config['save_probe']:
-        probe_name = f"checkpoints/probe_v20_{config['activation_layer']}.pt"
+        probe_name = f"checkpoints/probe_v21_{config['activation_layer']}.pt"
         torch.save(probe, probe_name)
 
 
 # %%
 if __name__ == "__main__":
 
-    os.environ['CUDA_VISIBLE_DEVICES'] = '1'
+    os.environ['CUDA_VISIBLE_DEVICES'] = '0'
 
     # for layer in range(32):
     config = {
         "use_wandb": True,
-        "dataset_file": ["open_ended_feedback_activations.pkl","open_ended_activations.pkl"],
-        "dataset_size": [92,106],
+        "dataset_file": ["open_ended_feedback_activations.pkl","open_ended_activations.pkl", "NLP_sycophantic_activations.pkl", "rotten_tomatoes_sycophantic_activations.pkl"],
+        "dataset_size": [92, 106, 100, 100],
         "activation_layer": 16,
         "split_train_test": 0.8,
 
@@ -614,7 +614,7 @@ if __name__ == "__main__":
 
         "OE_test": 'open_ended_feedback_activations.pkl',
 
-        "save_probe": False,
+        "save_probe": True,
     }
 
     train(config)

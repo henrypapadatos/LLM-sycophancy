@@ -218,10 +218,10 @@ def setup_wandb(config):
     # Start a new run, tracking hyperparameters in config
     run = wandb.init(
         # Set the project where this run will be logged
-        project="probe_training_OE",
+        project="probe_training_OE_search",
         # #set the name of the run
         # name="prove V17",
-        # name=f"probe_{config['activation_layer']}",
+        name=f"probe_{config['activation_layer']}",
         # Track hyperparameters
         config=config,
     )
@@ -598,23 +598,23 @@ if __name__ == "__main__":
 
     os.environ['CUDA_VISIBLE_DEVICES'] = '0'
 
-    # for layer in range(32):
-    config = {
-        "use_wandb": True,
-        "dataset_file": ["open_ended_feedback_activations.pkl","open_ended_activations.pkl", "NLP_sycophantic_activations.pkl", "rotten_tomatoes_sycophantic_activations.pkl"],
-        "dataset_size": [92, 106, 100, 100],
-        "activation_layer": 16,
-        "split_train_test": 0.8,
+    for layer in range(32):
+        config = {
+            "use_wandb": True,
+            "dataset_file": ["open_ended_feedback_activations.pkl","open_ended_activations.pkl", "NLP_sycophantic_activations.pkl", "rotten_tomatoes_sycophantic_activations.pkl"],
+            "dataset_size": [92, 106, 100, 100],
+            "activation_layer": layer,
+            "split_train_test": 0.8,
 
-        "number_of_layers": 1,
-        "learning_rate": 0.0005,
-        "epochs": 120,
-        "batch_size": 4,
-        "L2": 0.00005,
+            "number_of_layers": 1,
+            "learning_rate": 0.0005,
+            "epochs": 120,
+            "batch_size": 4,
+            "L2": 0.00005,
 
-        "OE_test": 'open_ended_feedback_activations.pkl',
+            "OE_test": 'open_ended_test_feedback_activations.pkl',
 
-        "save_probe": True,
-    }
+            "save_probe": False,
+        }
 
-    train(config)
+        train(config)

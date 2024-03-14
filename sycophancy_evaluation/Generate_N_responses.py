@@ -1,5 +1,5 @@
 import os
-AVAILABLE_GPUS = '2'
+AVAILABLE_GPUS = '6'
 os.environ['CUDA_VISIBLE_DEVICES'] = AVAILABLE_GPUS
 
 import torch
@@ -20,8 +20,8 @@ model_name_or_path = 'openchat/openchat_3.5'
 
 
 #only cut_off/5 different poems will be used
-cut_off_start = 300
-cut_off_stop = 800
+cut_off_start = 800
+cut_off_stop = 1300
 print("cut_off_start:", cut_off_start)
 print("cut_off_stop:", cut_off_stop)
 N_samples = 32
